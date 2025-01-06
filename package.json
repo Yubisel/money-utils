@@ -1,0 +1,74 @@
+{
+  "name": "@thesmilingsloth/money-utils",
+  "version": "0.0.1",
+  "description": "A robust money handling utility for JavaScript/TypeScript",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "browser": "./dist/index.modern.mjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "format": "biome format --write .",
+    "lint": "biome lint .",
+    "check": "biome check --apply ."
+  },
+  "keywords": [
+    "money",
+    "currency",
+    "finance",
+    "decimal",
+    "typescript"
+  ],
+  "author": "Smiling Sloth",
+  "license": "MIT",
+  "dependencies": {
+    "decimal.js": "10.4.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.5.3",
+    "@vitest/coverage-v8": "^1.2.2",
+    "terser": "^5.37.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.12",
+    "vite-plugin-dts": "^3.7.2",
+    "vitest": "^1.2.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/money-utils.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/money-utils/issues"
+  },
+  "homepage": "https://github.com/yourusername/money-utils#readme",
+  "peerDependencies": {
+    "decimal.js": ">=10.0.0"
+  },
+  "browserslist": [
+    "defaults",
+    "not IE 11",
+    "maintained node versions"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
