@@ -1,6 +1,6 @@
 {
   "name": "@thesmilingsloth/money-utils",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A robust money handling utility for JavaScript/TypeScript",
   "type": "module",
   "main": "./dist/index.js",
