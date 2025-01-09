@@ -54,12 +54,12 @@
   "sideEffects": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/money-utils.git"
+    "url": "git+https://github.com/thesmilingsloth/money-utils.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/money-utils/issues"
+    "url": "https://github.com/thesmilingsloth/money-utils/issues"
   },
-  "homepage": "https://github.com/yourusername/money-utils#readme",
+  "homepage": "https://github.com/thesmilingsloth/money-utils#readme",
   "peerDependencies": {
     "decimal.js": ">=10.0.0"
   },
