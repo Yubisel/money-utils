@@ -6,6 +6,7 @@ dist/
 
 # Coverage
 coverage/
+.nyc_output/
 
 # Logs
 *.log

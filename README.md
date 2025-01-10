@@ -2,17 +2,40 @@
 
 A robust, type-safe money handling utility for JavaScript/TypeScript applications with support for both fiat and cryptocurrency operations.
 
-[![npm version](https://badge.fury.io/js/@thesmilingsloth%2Fmoney-utils.svg)](https://badge.fury.io/js/@thesmilingsloth%2Fmoney-utils)
+<!-- [![npm downloads](https://img.shields.io/npm/dm/@thesmilingsloth/money-utils.svg?style=flat)](https://www.npmjs.com/package/@thesmilingsloth/money-utils) -->
+
+[![npm version](https://img.shields.io/npm/v/@thesmilingsloth/money-utils.svg?style=flat)](https://www.npmjs.com/package/@thesmilingsloth/money-utils)
+[![Bundle Size](https://img.shields.io/bundlephobia/minzip/@thesmilingsloth/money-utils)](https://bundlephobia.com/package/@thesmilingsloth/money-utils)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+## Overview
+
+`@thesmilingsloth/money-utils` is a comprehensive solution for handling monetary calculations in JavaScript/TypeScript applications. It provides precise decimal arithmetic, supports both fiat and cryptocurrencies, and ensures type safety throughout your financial operations.
+
+## Features
+
+- 🎯 **Type-safe**: Written in TypeScript with comprehensive type definitions
+- 💰 **Precise calculations**: Uses [decimal.js](https://github.com/MikeMcl/decimal.js/) for accurate decimal arithmetic
+- 🌍 **Internationalization**: Built-in support for formatting and localization
+- 🔄 **Currency conversion**: Support for both fiat and cryptocurrencies
+- 🛡️ **Immutable operations**: All operations return new instances
+- 🎨 **Customizable**: Configurable decimal places, rounding modes, and formatting options
+- 🌲 **Tree-shakeable**: Import only what you need
+- 0️⃣ **Minimal dependencies**: Only includes decimal.js for precise calculations
 
 ## Table of Contents
 
-- [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Core Concepts](#core-concepts)
   - [Money Class](#money-class)
   - [Currency Management](#currency-management)
+- [Default Options & Configurations](#default-options-and-configurations)
+  - [Money Options](#money-options)
+  - [Currency Defaults](#currency-defaults)
+  - [Formatting Defaults](#formatting-defaults)
+  - [Rounding Defaults](#rounding-defaults)
 - [Advanced Usage](#advanced-usage)
   - [Custom Currencies](#custom-currencies)
   - [Rounding Modes](#rounding-modes)
@@ -29,18 +52,6 @@ A robust, type-safe money handling utility for JavaScript/TypeScript application
 - [Contributing](#contributing)
 - [Testing](#testing)
 - [License](#license)
-- [Acknowledgments](#acknowledgments)
-
-## Features
-
-- 🎯 **Type-safe**: Written in TypeScript with comprehensive type definitions
-- 💰 **Precise calculations**: Uses [decimal.js](https://github.com/MikeMcl/decimal.js/) for accurate decimal arithmetic
-- 🌍 **Internationalization**: Built-in support for formatting and localization
-- 🔄 **Currency conversion**: Support for both fiat and cryptocurrencies
-- 🛡️ **Immutable operations**: All operations return new instances
-- 🎨 **Customizable**: Configurable decimal places, rounding modes, and formatting options
-- 🌲 **Tree-shakeable**: Import only what you need
-- 0️⃣ **Zero dependencies**: Includes decimal.js as its only dependency
 
 ## Installation
 
@@ -62,165 +73,210 @@ pnpm add @thesmilingsloth/money-utils
 ```typescript
 import { Money, Currency } from "@thesmilingsloth/money-utils";
 
-// Create a new money instance
+// Create money instances
 const price = new Money("99.99", "USD");
+const quantity = 2;
 
-// Basic arithmetic operations
-const tax = price.multiply(0.2); // 20% tax
-const total = price.add(tax);
+// Perform calculations
+const subtotal = price.multiply(quantity);
+const tax = subtotal.multiply("0.2"); // 20% tax
+const total = subtotal.add(tax);
 
-// Format with symbol
-console.log(total.toString()); // "$119.99"
+// Format output
+console.log(total.toString()); // "$239.98"
+console.log(total.toLocaleString("de-DE")); // "239,98 $"
 
-// Locale-aware formatting
-console.log(total.toLocaleString("de-DE")); // "119,99 $"
+// Work with different currencies
+const euro = new Money("100", "EUR");
+const yen = new Money("10000", "JPY");
+
+// Compare amounts (same currency)
+console.log(price.lessThan(total)); // true
 ```
 
 ## Core Concepts
 
 ### Money Class
 
-The `Money` class is the core of this library. It provides:
-
-- Immutable arithmetic operations (add, subtract, multiply, divide)
-- Comparison methods
-- Formatting options
-- Allocation functionality
-- Rounding controls
+The `Money` class is immutable and handles all monetary operations:
 
 ```typescript
-// Creating money instances
+// Basic operations
 const amount = new Money("100.50", "USD");
-const zero = Money.zero("USD");
+const doubled = amount.multiply(2);
+const withTax = doubled.add(doubled.multiply("0.1")); // Add 10% tax
 
-// Arithmetic
-const sum = amount.add(new Money("50.25", "USD"));
-const product = amount.multiply(2);
-
-// Comparisons
-const isGreater = amount.greaterThan(zero);
-const isEqual = amount.equals(new Money("100.50", "USD"));
+// Comparison
+const isExpensive = withTax.greaterThan(new Money("200", "USD"));
 
 // Formatting
-console.log(amount.toString()); // "$100.50"
-console.log(amount.toLocaleString("ja-JP")); // "￥100.50"
+console.log(withTax.toString()); // "$221.10"
+console.log(withTax.toLocaleString("ja-JP")); // "￥221.10"
 ```
 
 ### Currency Management
 
-The `Currency` class manages currency configurations through a singleton registry:
+Manage currencies using the `Currency` class:
 
 ```typescript
-// Access built-in currencies
+// Built-in currencies
 const usd = Currency.USD;
+const eur = Currency.EUR;
 const btc = Currency.BTC;
 
-// Get all registered currencies
-const allCurrencies = Currency.currencies;
-
-// Get a specific currency
-const eur = Currency.getCurrency("EUR");
-```
-
-## Advanced Usage
-
-### Custom Currencies
-
-Register and use custom currencies, including cryptocurrencies and tokens:
-
-```typescript
-// Register a custom cryptocurrency
+// Custom currency registration
 Currency.register({
   name: "Custom Token",
   code: "CTK",
   symbol: "⚡",
   symbolPosition: "prefix",
-  decimalSeparator: ".",
   decimals: 6,
   minorUnits: "1000000",
+  decimalSeparator: ".",
   thousandsSeparator: ",",
   isCrypto: true,
 });
 
-// Use the custom currency
+// Use custom currency
 const tokenAmount = new Money("1000.123456", "CTK");
-console.log(tokenAmount.toString()); // "⚡1,000.123456"
-
-// Register multiple currencies at once
-Currency.register([
-  {
-    name: "Gold Token",
-    code: "GLD",
-    symbol: "🔶",
-    symbolPosition: "prefix",
-    decimals: 8,
-    minorUnits: "100000000",
-    decimalSeparator: ".",
-    thousandsSeparator: ",",
-    isCrypto: true,
-  },
-  {
-    name: "Silver Token",
-    code: "SLV",
-    symbol: "🔷",
-    symbolPosition: "suffix",
-    decimals: 4,
-    minorUnits: "10000",
-    decimalSeparator: ".",
-    thousandsSeparator: ",",
-    isCrypto: true,
-  },
-]);
-
-// Initialize with specific currencies only
-Currency.initialize([Currency.USD, Currency.EUR, customToken]);
 ```
 
-### Rounding Modes
+## Default Options & Configurations
 
-Control decimal precision and rounding behavior:
+### Money Options
+
+When creating a new `Money` instance, you can provide options to customize its behavior. Here are the default values:
+
+```typescript
+const defaultMoneyOptions = {
+  decimals: undefined, // Uses the currency's default decimals
+  displayDecimals: undefined, // Uses the currency's default decimals
+  roundingMode: ROUNDING_MODE.ROUND_HALF_UP,
+  symbol: undefined, // Uses the currency's default symbol
+};
+
+// Example with custom options
+const amount = new Money("100.555", "USD", {
+  decimals: 3, // Override default decimal places
+  displayDecimals: 2, // Show only 2 decimals in formatting
+  roundingMode: ROUNDING_MODE.ROUND_DOWN,
+  symbol: "USD", // Custom symbol instead of "$"
+});
+```
+
+### Currency Defaults
+
+Built-in currencies come with pre-configured defaults. Here are some examples:
+
+```typescript
+// USD Configuration
+const USDDefaults = {
+  name: "US Dollar",
+  code: "USD",
+  symbol: "$",
+  symbolPosition: "prefix",
+  decimals: 2,
+  minorUnits: "100",
+  decimalSeparator: ".",
+  thousandsSeparator: ",",
+  isCrypto: false,
+};
+
+// BTC Configuration
+const BTCDefaults = {
+  name: "Bitcoin",
+  code: "BTC",
+  symbol: "₿",
+  symbolPosition: "prefix",
+  decimals: 8,
+  minorUnits: "100000000",
+  decimalSeparator: ".",
+  thousandsSeparator: ",",
+  isCrypto: true,
+};
+
+// Example of using defaults vs custom options
+const defaultUSD = new Money("100", "USD"); // Uses USD defaults
+const customUSD = new Money("100", "USD", {
+  decimals: 4, // Override default 2 decimals
+  symbol: "US$", // Override default "$" symbol
+});
+```
+
+### Formatting Defaults
+
+The library uses the following default formatting behavior:
+
+```typescript
+// Default toString() behavior
+const amount = new Money("1234.56", "USD");
+console.log(amount.toString()); // "$1,234.56"
+
+// Default toLocaleString() options
+console.log(amount.toLocaleString()); // Uses browser's default locale
+console.log(amount.toLocaleString("en-US")); // "$1,234.56"
+console.log(amount.toLocaleString("de-DE")); // "1.234,56 $"
+
+// Custom format options
+console.log(
+  amount.toLocaleString("en-US", {
+    style: "currency",
+    currencyDisplay: "name", // "1,234.56 US dollars"
+  })
+);
+```
+
+### Rounding Defaults
+
+```typescript
+// Default rounding mode is ROUND_HALF_UP
+const amount = new Money("100.555", "USD");
+console.log(amount.toString()); // "$100.56"
+
+// Different rounding modes
+const roundDown = new Money("100.555", "USD", {
+  roundingMode: ROUNDING_MODE.ROUND_DOWN,
+});
+console.log(roundDown.toString()); // "$100.55"
+
+const roundUp = new Money("100.555", "USD", {
+  roundingMode: ROUNDING_MODE.ROUND_UP,
+});
+console.log(roundUp.toString()); // "$100.56"
+```
+
+## Advanced Usage
+
+### Rounding Modes
 
 ```typescript
 import { Money, ROUNDING_MODE } from "@thesmilingsloth/money-utils";
 
-// Create with specific rounding mode
 const amount = new Money("100.555", "USD", {
   roundingMode: ROUNDING_MODE.ROUND_HALF_UP,
   decimals: 2,
 });
 
-// Different rounding modes
-const roundUp = new Money("100.555", "USD", {
-  roundingMode: ROUNDING_MODE.ROUND_UP,
-});
-const roundDown = new Money("100.555", "USD", {
-  roundingMode: ROUNDING_MODE.ROUND_DOWN,
-});
-
-// Round to specific decimals
-const rounded = amount.round(2); // Rounds to 2 decimal places
+// Different rounding behaviors
+console.log(amount.toString()); // "$100.56"
+console.log(amount.round(1).toString()); // "$100.60"
 ```
 
 ### Allocation
 
-Split money into parts while handling remainders:
+Split amounts while handling remainders:
 
 ```typescript
-// Split amount equally
-const amount = new Money("100", "USD");
-const equalShares = amount.allocate([1, 1, 1]); // [33.34, 33.33, 33.33]
+const total = new Money("100", "USD");
 
 // Split by ratios
-const total = new Money("100", "USD");
-const shares = total.allocate([2, 3, 5]); // Split in ratio 2:3:5
-// shares[0] = $20.00
-// shares[1] = $30.00
-// shares[2] = $50.00
+const shares = total.allocate([2, 3, 5]); // 20:30:50 ratio
+console.log(shares.map((s) => s.toString()));
+// ["$20.00", "$30.00", "$50.00"]
 
-// Handle remainders automatically
-const oddAmount = new Money("100.01", "USD");
-const threeWaySplit = oddAmount.allocate([1, 1, 1]);
-// Remainder is added to first share
+// Equal distribution
+const equalShares = total.allocate([1, 1, 1]);
+// ["$33.34", "$33.33", "$33.33"]
 ```
 
 ### Formatting
@@ -247,10 +303,6 @@ console.log(
     currencyDisplay: "name",
   })
 ); // "1,234,567.89 US dollars"
-
-// Cryptocurrency formatting
-const btc = new Money("1.23456789", "BTC");
-console.log(btc.toString()); // "₿1.23456789"
 ```
 
 ### Comparison Operations
@@ -381,7 +433,7 @@ compare(other: Money): MoneyComparisonResult
 #### Value Methods
 
 ```typescript
-value(): string                       // Raw value as string
+value(): string                      // Raw value as string
 absoluteValue(): string              // Absolute value
 negatedValue(): string               // Negated value
 isZero(): boolean                    // Check if zero
@@ -392,7 +444,7 @@ isNegative(): boolean                // Check if negative
 #### Formatting Methods
 
 ```typescript
-toString(): string                   // Format with symbol
+toString(): string                  // Format with symbol
 formattedValue(): string            // Format without symbol
 formattedValueWithSymbol(): string  // Format with symbol
 toLocaleString(locale?: string, options?: Intl.NumberFormatOptions): string
@@ -403,7 +455,7 @@ toLocaleString(locale?: string, options?: Intl.NumberFormatOptions): string
 #### Static Methods
 
 ```typescript
-static register(currency: CurrencyConfig | CurrencyConfig[]): CurrencyConfig | CurrencyConfig[]
+static register(currency: CurrencyConfig | CurrencyConfig[]): void
 ```
 
 Register new currency configurations.
@@ -492,13 +544,29 @@ const SYMBOL_POSITION = {
 } as const;
 ```
 
-For more detailed API documentation and examples, visit our [TypeDoc Documentation](https://github.com/yourusername/money-utils/docs).
-
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
+### Development
+
+```bash
+# Install dependencies
+pnpm install
+
+# Run tests
+pnpm test
+
+# Build the project
+pnpm build
+
+# Run linter
+pnpm lint
+```
+
 ## Testing
+
+We use Vitest for testing. Run the test suite:
 
 ```bash
 # Run tests

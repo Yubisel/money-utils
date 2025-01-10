@@ -1,4 +1,4 @@
-import Decimal from "decimal.js";
+import { Decimal } from "decimal.js";
 import { CurrencyConfig } from "../types/currency";
 import { Currency } from "./Currency";
 import {
@@ -7,7 +7,7 @@ import {
   MoneyOptions,
   RoundingMode,
 } from "../types/money";
-import { DEFAULT_DECIMAL_PLACES, SYMBOL_POSITION } from "../constants/symbols";
+import { SYMBOL_POSITION } from "../constants/symbols";
 import { ROUNDING_MODE } from "../constants/money";
 import { MoneyError, ERROR_MESSAGES } from "../errors/MoneyErrors";
 
@@ -29,8 +29,123 @@ export class Money {
   private symbol: string;
   private decimals: number;
   private displayDecimals: number;
-  private negative: boolean;
   private roundingMode: RoundingMode;
+
+  /**
+   * Scale definitions for number abbreviations.
+   * Ordered from largest to smallest for proper matching.
+   */
+  private static readonly SCALES = [
+    { value: new Decimal("1000000000000"), symbol: "T" }, // trillion
+    { value: new Decimal("1000000000"), symbol: "B" }, // billion
+    { value: new Decimal("1000000"), symbol: "M" }, // million
+    { value: new Decimal("1000"), symbol: "K" }, // thousand
+  ] as const;
+
+  private cloneWithNewAmount(amount: Decimal): Money {
+    return new Money(amount.toString(), this.currencyConfig.code, {
+      symbol: this.symbol,
+      decimals: this.decimals,
+      displayDecimals: this.displayDecimals,
+      roundingMode: this.roundingMode,
+    });
+  }
+
+  private validateAmount(value: string | number): void {
+    try {
+      const decimal = new Decimal(value);
+
+      if (!decimal.isFinite()) {
+        throw new MoneyError(ERROR_MESSAGES.INVALID_AMOUNT);
+      }
+    } catch (error) {
+      throw new MoneyError(ERROR_MESSAGES.INVALID_AMOUNT);
+    }
+  }
+
+  private assertSameCurrency(other: Money): void {
+    if (this.currencyConfig.code !== other.currencyConfig.code) {
+      throw new Error(
+        `Money: Cannot operate on different currencies(current: "${this.currencyConfig.code}", other: "${other.currencyConfig.code}")`
+      );
+    }
+  }
+
+  private getCurrencyConfig(code: string): CurrencyConfig {
+    const currencyConfig = Currency.getCurrency(code);
+
+    if (!currencyConfig) {
+      throw new Error(
+        `Money: Currency config for ${code} not found. Config can be registered with "Currency.register(<CurrencyConfig>)"`
+      );
+    }
+
+    return currencyConfig;
+  }
+
+  private formatValue(): string {
+    const roundedAmount = this.amount
+      .toDecimalPlaces(this.displayDecimals, this.roundingMode)
+      .abs();
+
+    // Format with thousand separators and decimal separator
+    const parts = roundedAmount.toFixed(this.displayDecimals).split(".");
+
+    // Replace every group of three digits in the integer part with the thousands separator
+    const integerPart = parts[0].replace(
+      /\B(?=(\d{3})+(?!\d))/g, // Regular expression to find positions for thousands separator
+      this.currencyConfig.thousandsSeparator // The thousands separator from the currency configuration
+    );
+    const decimalPart = parts[1] || "";
+
+    return decimalPart
+      ? `${integerPart}${this.currencyConfig.decimalSeparator}${decimalPart}`
+      : integerPart;
+  }
+
+  private formatNumberWithSign(value: string): string {
+    return this.isPositive() ? value : `-${value}`;
+  }
+
+  /**
+   * Formats the absolute value with the appropriate scale (K, M, B, T).
+   */
+  private formatWithScale(value: Decimal, maxDecimals: number): string {
+    // Round the value first to handle values just below boundaries
+    const roundedValue = value.toDecimalPlaces(maxDecimals, this.roundingMode);
+
+    // Find the first scale that the rounded value is greater than or equal to
+    const scale = Money.SCALES.find((s) =>
+      roundedValue.greaterThanOrEqualTo(s.value)
+    );
+
+    if (!scale) {
+      // If value is less than 1000, just return the formatted number
+      return roundedValue.toDecimalPlaces(this.displayDecimals).toString();
+    }
+
+    // Format with scale symbol (K, M, B, T)
+    return `${roundedValue
+      .dividedBy(scale.value)
+      .toDecimalPlaces(maxDecimals)}${scale.symbol}`;
+  }
+
+  /**
+   * Applies final formatting including negative sign and currency symbol.
+   */
+  private applyFormatting(value: string, withSymbol: boolean): string {
+    // If no symbol requested, just add negative sign to value
+    if (!withSymbol) {
+      return this.isNegative() ? `-${value}` : value;
+    }
+
+    const formattedValue =
+      this.currencyConfig.symbolPosition === SYMBOL_POSITION.PREFIX
+        ? `${this.symbol}${value}`
+        : `${value}${this.symbol}`;
+
+    return this.formatNumberWithSign(formattedValue);
+  }
 
   /**
    * Creates a new Money instance.
@@ -54,17 +169,11 @@ export class Money {
 
     this.currencyConfig = this.getCurrencyConfig(currency);
     this.amount = new Decimal(value);
-    this.negative = this.amount.lt(0);
 
     this.symbol = options?.symbol ?? this.currencyConfig.symbol;
-    this.decimals =
-      options?.decimals ??
-      this.currencyConfig.decimals ??
-      DEFAULT_DECIMAL_PLACES;
+    this.decimals = options?.decimals ?? this.currencyConfig.decimals;
     this.displayDecimals =
-      options?.displayDecimals ??
-      this.currencyConfig.decimals ??
-      DEFAULT_DECIMAL_PLACES;
+      options?.displayDecimals ?? this.currencyConfig.decimals;
     this.roundingMode = options?.roundingMode ?? ROUNDING_MODE.ROUND_HALF_EVEN;
   }
 
@@ -98,26 +207,6 @@ export class Money {
     options?: MoneyOptions
   ): Money {
     return new Money(value, currency, options);
-  }
-
-  private assertSameCurrency(other: Money): void {
-    if (this.currencyConfig.code !== other.currencyConfig.code) {
-      throw new Error(
-        `Money: Cannot operate on different currencies(current: "${this.currencyConfig.code}", other: "${other.currencyConfig.code}")`
-      );
-    }
-  }
-
-  private getCurrencyConfig(code: string): CurrencyConfig {
-    const currencyConfig = Currency.getCurrency(code);
-
-    if (!currencyConfig) {
-      throw new Error(
-        `Money: Currency config for ${code} not found. Config can be registered with "Currency.register(<CurrencyConfig>)"`
-      );
-    }
-
-    return currencyConfig;
   }
 
   /**
@@ -232,15 +321,14 @@ export class Money {
       .sort((a, b) => b.mod - a.mod);
 
     // Distribute the remainder
-    const result = shareFloors.map(
-      (share) =>
-        new Money(share.toString(), this.currencyConfig.code, {
-          symbol: this.symbol,
-          decimals: this.decimals,
-          displayDecimals: this.displayDecimals,
-          roundingMode: this.roundingMode,
-        })
-    );
+    const result = shareFloors.map((share) => {
+      return new Money(share.toString(), this.currencyConfig.code, {
+        symbol: this.symbol,
+        decimals: this.decimals,
+        displayDecimals: this.displayDecimals,
+        roundingMode: this.roundingMode,
+      });
+    });
 
     // Add one minor unit to shares that should get it
     for (let i = 0; i < remainderInMinorUnits; i++) {
@@ -248,6 +336,7 @@ export class Money {
       const minorUnit = new Decimal(1).dividedBy(
         new Decimal(this.currencyConfig.minorUnits)
       );
+
       result[targetIndex] = result[targetIndex].add(
         new Money(minorUnit.toString(), this.currencyConfig.code, {
           symbol: this.symbol,
@@ -358,7 +447,7 @@ export class Money {
    * @returns true if the value is positive
    */
   isPositive(): boolean {
-    return !this.negative && this.amount.isPositive();
+    return this.amount.isPositive();
   }
 
   /**
@@ -367,7 +456,7 @@ export class Money {
    * @returns true if the value is negative
    */
   isNegative(): boolean {
-    return this.negative;
+    return this.amount.isNegative();
   }
 
   /**
@@ -403,25 +492,7 @@ export class Money {
    * @returns Formatted string representation of the monetary value
    */
   formattedValue(): string {
-    // First round to the specified number of decimal places
-    const roundedAmount = this.amount.toDecimalPlaces(
-      this.displayDecimals,
-      this.roundingMode
-    );
-
-    // Format with thousand separators and decimal separator
-    const parts = roundedAmount.toFixed(this.displayDecimals).split(".");
-
-    // Replace every group of three digits in the integer part with the thousands separator
-    const integerPart = parts[0].replace(
-      /\B(?=(\d{3})+(?!\d))/g, // Regular expression to find positions for thousands separator
-      this.currencyConfig.thousandsSeparator // The thousands separator from the currency configuration
-    );
-    const decimalPart = parts[1] || "";
-
-    return decimalPart
-      ? `${integerPart}${this.currencyConfig.decimalSeparator}${decimalPart}`
-      : integerPart;
+    return this.formatNumberWithSign(this.formatValue());
   }
 
   /**
@@ -431,10 +502,10 @@ export class Money {
    */
   formattedValueWithSymbol(): string {
     if (this.currencyConfig.symbolPosition === SYMBOL_POSITION.PREFIX) {
-      return `${this.symbol}${this.formattedValue()}`;
+      return this.formatNumberWithSign(`${this.symbol}${this.formatValue()}`);
     }
 
-    return `${this.formattedValue()}${this.symbol}`;
+    return this.formatNumberWithSign(`${this.formatValue()}${this.symbol}`);
   }
 
   /**
@@ -464,15 +535,6 @@ export class Money {
     }).format(this.amount.toNumber());
   }
 
-  private cloneWithNewAmount(amount: Decimal): Money {
-    return new Money(amount.toString(), this.currencyConfig.code, {
-      symbol: this.symbol,
-      decimals: this.decimals,
-      displayDecimals: this.displayDecimals,
-      roundingMode: this.roundingMode,
-    });
-  }
-
   /**
    * Rounds the monetary value to the specified number of decimal places.
    *
@@ -487,16 +549,67 @@ export class Money {
     );
   }
 
-  private validateAmount(value: string | number): void {
-    try {
-      const decimal = new Decimal(value);
-
-      if (!decimal.isFinite()) {
-        throw new MoneyError(ERROR_MESSAGES.INVALID_AMOUNT);
-      }
-    } catch (error) {
-      throw new MoneyError(ERROR_MESSAGES.INVALID_AMOUNT);
+  /**
+   * Converts this Money instance to another currency using another Money instance as the exchange rate basis.
+   * The target Money instance represents how much 1 unit of the source currency is worth in the target currency.
+   *
+   * @param targetMoney - Money instance representing the exchange rate (1 unit of this currency in target currency)
+   * @returns A new Money instance in the target currency
+   * @throws {MoneyError} If the exchange rate Money is zero or negative
+   *
+   * @example
+   * ```typescript
+   * // If 1 USD = 0.85 EUR
+   * const rate = new Money('0.85', 'EUR');
+   * const usd = new Money('100.00', 'USD');
+   * const eur = usd.convertTo(rate); // €85.00
+   *
+   * // If 1 EUR = 162.5 JPY
+   * const rate = new Money('162.5', 'JPY');
+   * const eur = new Money('50.00', 'EUR');
+   * const jpy = eur.convertTo(rate); // ¥8,125
+   * ```
+   */
+  convertTo(targetMoney: Money): Money {
+    // Validate the exchange rate Money
+    if (targetMoney.isNegative() || targetMoney.isZero()) {
+      throw new MoneyError("Exchange rate must be greater than zero");
     }
+
+    // Convert using the exchange rate
+    return new Money(
+      this.amount.times(targetMoney.amount).toString(),
+      targetMoney.currencyConfig.code,
+      {
+        decimals: targetMoney.decimals,
+        displayDecimals: targetMoney.displayDecimals,
+        roundingMode: targetMoney.roundingMode,
+      }
+    );
+  }
+
+  /**
+   * Returns an abbreviated string representation of the monetary value.
+   * Formats large numbers using K (thousands), M (millions), B (billions), and T (trillions).
+   * Numbers less than 1000 are not abbreviated.
+   *
+   * @param maxDecimals - Maximum number of decimal places to show in abbreviated form (default: 1)
+   * @param withSymbol - Whether to include the currency symbol (default: true)
+   * @returns Abbreviated string representation
+   *
+   * @example
+   * ```typescript
+   * new Money('1234', 'USD').abbreviatedValue(); // "$1.2K"
+   * new Money('1234567', 'USD').abbreviatedValue(); // "$1.2M"
+   * new Money('1234567890', 'USD').abbreviatedValue(); // "$1.2B"
+   * new Money('1234567890123', 'USD').abbreviatedValue(); // "$1.2T"
+   * ```
+   */
+  abbreviatedValue(maxDecimals = 1, withSymbol = false): string {
+    const absValue = this.amount.abs();
+    const formatted = this.formatWithScale(absValue, maxDecimals);
+
+    return this.applyFormatting(formatted, withSymbol);
   }
 
   /**
@@ -512,7 +625,6 @@ export class Money {
       displayDecimals: this.displayDecimals,
       value: this.value(),
       prettyValue: this.formattedValueWithSymbol(),
-      negative: this.negative,
     };
   }
 

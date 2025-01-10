@@ -30,9 +30,6 @@ export type MoneyObject = {
 
   /** Formatted value with currency symbol */
   prettyValue: string;
-
-  /** Whether the amount is negative */
-  negative: boolean;
 };
 
 /**
